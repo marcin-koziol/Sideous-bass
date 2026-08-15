@@ -434,7 +434,15 @@ protected:
                 mix += voice.process();
             mix += fMonoVoice.process();
 
-            mix *= fMasterVolume * kVoiceHeadroom;
+            // mono mode (the default - basslines are conventionally
+            // monophonic) never has more than one voice sounding: glide/
+            // legato retrigger the same fMonoVoice, they don't stack like
+            // poly mode's up-to-8 fVoices can. Using poly's worst-case
+            // headroom unconditionally made the instrument's own default
+            // patch needlessly quiet - kPolyHeadroom stays conservative for
+            // when chords actually can stack.
+            const float headroom = fMonoMode ? kMonoHeadroom : kPolyHeadroom;
+            mix *= fMasterVolume * headroom;
 
             // gentle safety saturation: Ring/Sync push extra harmonic energy
             // into a resonant filter compared to a plain saw/pulse, and can
@@ -451,7 +459,8 @@ protected:
     }
 
 private:
-    static constexpr const float kVoiceHeadroom = 1.0f / 3.0f;
+    static constexpr const float kMonoHeadroom = 0.85f;
+    static constexpr const float kPolyHeadroom = 1.0f / 3.0f;
 
     void handleMidiEvent(const MidiEvent& event) noexcept
     {
