@@ -143,14 +143,18 @@ protected:
             const int presetBtn = hitTestPresetButton(mx, my);
             if (presetBtn >= 0)
             {
-                fEditingName = false; // a button click always cancels any in-progress rename
+                // SAVE must see fEditingName/fEditBuffer as-is - it commits the
+                // in-progress rename itself (and clears fEditingName when done).
+                // Clearing it here first, like the other buttons do to cancel a
+                // pending rename, made SAVE silently discard the typed name and
+                // fall back to whatever fCurrentName already was.
                 switch (presetBtn)
                 {
-                case 0: presetStep(-1); break;
-                case 1: presetStep(1);  break;
+                case 0: fEditingName = false; presetStep(-1); break;
+                case 1: fEditingName = false; presetStep(1);  break;
                 case 2: presetSave();   break;
-                case 3: presetDelete(); break;
-                default: break;
+                case 3: fEditingName = false; presetDelete(); break;
+                default: fEditingName = false; break;
                 }
                 repaint();
                 return true;
@@ -268,7 +272,19 @@ protected:
             float t = fDragStartT + (float)(dy / 200.0);
             t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
 
-            const float value = ui::normalizedToParam(k.param, t);
+            float value = ui::normalizedToParam(k.param, t);
+
+            // Shift+drag snaps to a fixed step (only defined for knobs
+            // where landing on an exact value actually matters, e.g.
+            // Ring/Sync's Ratio - see ui::shiftSnapStep())
+            const float step = ui::shiftSnapStep(k.param);
+            if (step > 0.0f && (ev.mod & kModifierShift))
+            {
+                const ParamInfo& info = getParamInfo(k.param);
+                value = std::round(value / step) * step;
+                value = value < info.min ? info.min : (value > info.max ? info.max : value);
+            }
+
             fValues[k.param] = value;
             setParameterValue(k.param, value);
             repaint();

@@ -213,44 +213,30 @@ inline Layout buildLayout(float width, float height)
     L.width = width;
     L.height = height;
 
-    const float margin = 16.0f;
-    const float gap = 14.0f;
+    // wide-and-short rather than narrow-and-tall (same rework as sideous):
+    // a 3-column grid for the simple panels, 2-column for the knob-heavy
+    // envelopes, and the patch bay given the *full* width instead of being
+    // squeezed into a tall narrow column - it only ever needed 7 destination
+    // rows of vertical space regardless of column width, so widening it
+    // shrinks its height for free instead of needing 400px to breathe.
+    const float margin = 12.0f;
+    const float gap = 8.0f;
+    const float fullW = width - margin * 2.0f;
+    const float colW = (fullW - gap) / 2.0f;             // 2-col rows: envelopes, LFO1/LFO2
+    const float colBx = margin + colW + gap;
+    const float col3W = (fullW - gap * 2.0f) / 3.0f;      // 3-col row: OSC/FILTER/ENGINE
+    const float col3Bx = margin + col3W + gap;
+    const float col3Cx = col3Bx + col3W + gap;
 
-    // two independent tracks side by side: a 2-column synthesis-panel grid
-    // on the left (Oscillator/Filter/AmpEnv/FilterEnv/Engine/EngineEnv, same
-    // shape every sibling uses), and a single narrower column on the right
-    // holding LFO1/LFO2/PATCH BAY - keeping the whole modulation story (two
-    // generators feeding straight into the matrix that routes them) in one
-    // vertical strip instead of stretching the window ever taller. The two
-    // tracks generally end at different heights; the bottom bar spans full
-    // width below whichever track is taller.
-    const float leftW = 726.0f;
-    const float leftSubColW = (leftW - gap) / 2.0f;
-    const float leftColX = margin;
-    const float leftColBx = leftColX + leftSubColW + gap;
+    // preset bar: full width, right below the header; everything else starts below it
+    const float presetBarY = 48.0f, presetBarH = 40.0f;
 
-    const float rightColX = leftColX + leftW + gap;
-    const float rightW = 480.0f;
-
-    const float totalContentW = rightColX + rightW - margin;
-
-    // preset bar: full width, spans both tracks, everything else starts below it
-    const float presetBarY = 64.0f, presetBarH = 46.0f;
-
-    // row1H must clear: top selector row (34+30) + gap to knob row (56) +
-    // knob radius (26) + label baseline offset (14) + bottom padding.
-    const float row1Y = presetBarY + presetBarH + gap, row1H = 176.0f;
-    const float row2Y = row1Y + row1H + gap, row2H = 210.0f;
-    const float row3Y = row2Y + row2H + gap, row3H = 210.0f;
-    const float leftTrackBottom = row3Y + row3H;
-
-    const float rRow1Y = row1Y, rRow1H = 210.0f;
-    const float rRow2Y = rRow1Y + rRow1H + gap, rRow2H = 210.0f;
-    const float rRow3Y = rRow2Y + rRow2H + gap, rRow3H = 400.0f;
-    const float rightTrackBottom = rRow3Y + rRow3H;
-
-    const float barY = (leftTrackBottom > rightTrackBottom ? leftTrackBottom : rightTrackBottom) + gap;
-    const float barH = height - barY - margin;
+    const float row1Y = presetBarY + presetBarH + gap, row1H = 136.0f;  // OSC/FILTER/ENGINE
+    const float row2Y = row1Y + row1H + gap, row2H = 146.0f;            // AMP/FILTER/ENGINE ENV
+    const float row3Y = row2Y + row2H + gap, row3H = 162.0f;            // LFO1/LFO2
+    const float row4Y = row3Y + row3H + gap, row4H = 260.0f;            // PATCH BAY
+    const float barY = row4Y + row4H + gap, barH = height - barY - margin;
+    const float totalContentW = fullW;
 
     // --- preset bar --- (all positions absolute, left-to-right: prev/next,
     // then the name field filling the middle, then save/delete flush right)
@@ -274,16 +260,16 @@ inline Layout buildLayout(float width, float height)
         L.presetBar.nameH = h;
     }
 
-    L.panels.push_back({ leftColX, row1Y, leftSubColW, row1H, "OSCILLATOR", kSteelBlue });
-    L.panels.push_back({ leftColBx, row1Y, leftSubColW, row1H, "FILTER",    kCopper });
-    L.panels.push_back({ leftColX, row2Y, leftSubColW, row2H, "AMP ENV",    kBrass });
-    L.panels.push_back({ leftColBx, row2Y, leftSubColW, row2H, "FILTER ENV", kRust });
-    L.panels.push_back({ leftColX, row3Y, leftSubColW, row3H, "ENGINE",     kCrtGreen });
-    L.panels.push_back({ leftColBx, row3Y, leftSubColW, row3H, "ENGINE ENV", kCrtGreen });
-    L.panels.push_back({ rightColX, rRow1Y, rightW, rRow1H, "LFO1",       kChrome });
-    L.panels.push_back({ rightColX, rRow2Y, rightW, rRow2H, "LFO2",       kAmber });
-    L.panels.push_back({ rightColX, rRow3Y, rightW, rRow3H, "PATCH BAY",  kCrtGreen });
-    L.panels.push_back({ margin, barY, totalContentW, barH, nullptr, kCrtGreen });
+    L.panels.push_back({ margin,  row1Y, col3W, row1H, "OSCILLATOR", kSteelBlue }); // 0
+    L.panels.push_back({ col3Bx,  row1Y, col3W, row1H, "FILTER",     kCopper });    // 1
+    L.panels.push_back({ margin,  row2Y, col3W, row2H, "AMP ENV",    kBrass });     // 2
+    L.panels.push_back({ col3Bx,  row2Y, col3W, row2H, "FILTER ENV", kRust });      // 3
+    L.panels.push_back({ col3Cx,  row1Y, col3W, row1H, "ENGINE",     kCrtGreen });  // 4
+    L.panels.push_back({ col3Cx,  row2Y, col3W, row2H, "ENGINE ENV", kCrtGreen });  // 5
+    L.panels.push_back({ margin,  row3Y, colW,  row3H, "LFO1",       kChrome });    // 6
+    L.panels.push_back({ colBx,   row3Y, colW,  row3H, "LFO2",       kAmber });     // 7
+    L.panels.push_back({ margin,  row4Y, fullW, row4H, "PATCH BAY",  kCrtGreen });  // 8
+    L.panels.push_back({ margin,  barY,  fullW, barH,  nullptr, kCrtGreen });       // 9
 
     // --- oscillator ---
     {
@@ -291,26 +277,26 @@ inline Layout buildLayout(float width, float height)
         Selector wave;
         wave.param = kParamWaveform;
         wave.accent = p.accent;
-        wave.x = p.x + 14.0f; wave.y = p.y + 34.0f; wave.w = p.w - 28.0f; wave.h = 30.0f;
+        wave.x = p.x + 12.0f; wave.y = p.y + 26.0f; wave.w = p.w - 24.0f; wave.h = 24.0f;
         wave.options = { { 0.0f, "SAW" }, { 1.0f, "PULSE" }, { 2.0f, "TRI" } };
         L.selectors.push_back(wave);
 
-        const float rowY = p.y + 34.0f + 30.0f + 56.0f;
+        const float rowY = p.y + 26.0f + 24.0f + 40.0f;
 
         // PW knob | sub-osc octave selector | sub-osc level knob, side by side
-        L.knobs.push_back({ kParamPulseWidth, p.x + p.w * 0.16f, rowY, 26.0f, "PW", p.accent });
+        L.knobs.push_back({ kParamPulseWidth, p.x + p.w * 0.16f, rowY, 22.0f, "PW", p.accent });
 
         Selector subOct;
         subOct.param = kParamSubOctave;
         subOct.accent = p.accent;
         subOct.w = p.w * 0.40f;
         subOct.x = p.x + p.w * 0.5f - subOct.w * 0.5f;
-        subOct.h = 28.0f;
+        subOct.h = 24.0f;
         subOct.y = rowY - subOct.h * 0.5f;
         subOct.options = { { -2.0f, "-2" }, { -1.0f, "-1" }, { 1.0f, "+1" }, { 2.0f, "+2" } };
         L.selectors.push_back(subOct);
 
-        L.knobs.push_back({ kParamSubLevel, p.x + p.w * 0.84f, rowY, 26.0f, "SUB LVL", p.accent });
+        L.knobs.push_back({ kParamSubLevel, p.x + p.w * 0.84f, rowY, 22.0f, "SUB LVL", p.accent });
     }
 
     // --- filter --- (Cutoff/Reso/Drive only - envelope amount is now
@@ -320,7 +306,7 @@ inline Layout buildLayout(float width, float height)
         Dropdown mode;
         mode.param = kParamFilterMode;
         mode.accent = p.accent;
-        mode.x = p.x + 14.0f; mode.y = p.y + 34.0f; mode.w = p.w - 28.0f; mode.h = 30.0f;
+        mode.x = p.x + 12.0f; mode.y = p.y + 26.0f; mode.w = p.w - 24.0f; mode.h = 24.0f;
         mode.options = {
             { 0.0f, "LOWPASS 12dB" },
             { 1.0f, "LOWPASS 24dB" },
@@ -331,7 +317,7 @@ inline Layout buildLayout(float width, float height)
         };
         L.dropdowns.push_back(mode);
 
-        addKnobRow(L.knobs, p.x, p.w, p.y + 34.0f + 30.0f + 56.0f, 26.0f, p.accent,
+        addKnobRow(L.knobs, p.x, p.w, p.y + 26.0f + 24.0f + 40.0f, 22.0f, p.accent,
                    {
                        { kParamFilterCutoff,    "CUTOFF" },
                        { kParamFilterResonance, "RESO" },
@@ -344,8 +330,8 @@ inline Layout buildLayout(float width, float height)
     // everything else)
     {
         const PanelBox& p = L.panels[2];
-        const float rowY = p.y + 34.0f + 60.0f;
-        addKnobRow(L.knobs, p.x, p.w, rowY, 24.0f, p.accent,
+        const float rowY = p.y + 26.0f + 30.0f;
+        addKnobRow(L.knobs, p.x, p.w, rowY, 20.0f, p.accent,
                    {
                        { kParamAmpAttack,           "ATTACK" },
                        { kParamAmpDecay,             "DECAY" },
@@ -357,15 +343,15 @@ inline Layout buildLayout(float width, float height)
 
         L.envelopeGraphs.push_back({
             kParamAmpAttack, kParamAmpDecay, kParamAmpSustain, kParamAmpRelease, kParamAmpCurve,
-            p.x + 14.0f, rowY + 24.0f + 24.0f, p.w - 28.0f, 56.0f, p.accent });
+            p.x + 12.0f, rowY + 20.0f + 22.0f, p.w - 24.0f, 38.0f, p.accent });
     }
 
     // --- filter envelope --- (generator only; what it modulates is decided
     // by the mod matrix)
     {
         const PanelBox& p = L.panels[3];
-        const float rowY = p.y + 34.0f + 60.0f;
-        addKnobRow(L.knobs, p.x, p.w, rowY, 24.0f, p.accent,
+        const float rowY = p.y + 26.0f + 30.0f;
+        addKnobRow(L.knobs, p.x, p.w, rowY, 20.0f, p.accent,
                    {
                        { kParamFilterAttack,   "ATTACK" },
                        { kParamFilterDecay,    "DECAY" },
@@ -376,7 +362,7 @@ inline Layout buildLayout(float width, float height)
 
         L.envelopeGraphs.push_back({
             kParamFilterAttack, kParamFilterDecay, kParamFilterSustain, kParamFilterRelease, kParamFilterEnvCurve,
-            p.x + 14.0f, rowY + 24.0f + 24.0f, p.w - 28.0f, 56.0f, p.accent });
+            p.x + 12.0f, rowY + 20.0f + 22.0f, p.w - 24.0f, 38.0f, p.accent });
     }
 
     // --- engine (Ring / Sync / Combined) - the instrument's core concept ---
@@ -386,7 +372,7 @@ inline Layout buildLayout(float width, float height)
         Selector engine;
         engine.param = kParamEngineMode;
         engine.accent = p.accent;
-        engine.x = p.x + 14.0f; engine.y = p.y + 34.0f; engine.w = p.w - 28.0f; engine.h = 30.0f;
+        engine.x = p.x + 12.0f; engine.y = p.y + 26.0f; engine.w = p.w - 24.0f; engine.h = 24.0f;
         engine.options = { { 0.0f, "RING" }, { 1.0f, "SYNC" }, { 2.0f, "COMBINED" } };
         L.selectors.push_back(engine);
 
@@ -394,7 +380,7 @@ inline Layout buildLayout(float width, float height)
         // selection (same convention as sideous-pad's Unison/Formant
         // panels) - Ratio drives Ring and Sync, Ring Mix only Ring, Grit
         // only Combined; the labels make each knob's relevance obvious.
-        addKnobRow(L.knobs, p.x, p.w, engine.y + engine.h + 56.0f, 26.0f, p.accent,
+        addKnobRow(L.knobs, p.x, p.w, engine.y + engine.h + 40.0f, 22.0f, p.accent,
                    {
                        { kParamRingSyncRatio, "RATIO" },
                        { kParamRingMix,       "RING MIX" },
@@ -406,8 +392,8 @@ inline Layout buildLayout(float width, float height)
     // matrix's Engine Env -> Ratio cell - the classic "swept sync" bass move)
     {
         const PanelBox& p = L.panels[5];
-        const float rowY = p.y + 34.0f + 60.0f;
-        addKnobRow(L.knobs, p.x, p.w, rowY, 24.0f, p.accent,
+        const float rowY = p.y + 26.0f + 30.0f;
+        addKnobRow(L.knobs, p.x, p.w, rowY, 20.0f, p.accent,
                    {
                        { kParamEngineAttack,    "ATTACK" },
                        { kParamEngineDecay,      "DECAY" },
@@ -418,7 +404,7 @@ inline Layout buildLayout(float width, float height)
 
         L.envelopeGraphs.push_back({
             kParamEngineAttack, kParamEngineDecay, kParamEngineSustain, kParamEngineRelease, kParamEngineEnvCurve,
-            p.x + 14.0f, rowY + 24.0f + 24.0f, p.w - 28.0f, 56.0f, p.accent });
+            p.x + 12.0f, rowY + 20.0f + 22.0f, p.w - 24.0f, 38.0f, p.accent });
     }
 
     // --- LFO1 / LFO2 --- (generators only; destinations are entirely the
@@ -428,36 +414,36 @@ inline Layout buildLayout(float width, float height)
         Selector wave;
         wave.param = kParamLfo1Waveform;
         wave.accent = p.accent;
-        wave.x = p.x + 14.0f; wave.y = p.y + 34.0f; wave.w = p.w - 28.0f; wave.h = 30.0f;
+        wave.x = p.x + 12.0f; wave.y = p.y + 26.0f; wave.w = p.w - 24.0f; wave.h = 24.0f;
         wave.options = { { 0.0f, "SINE" }, { 1.0f, "SAW" }, { 2.0f, "SQR" } };
         L.selectors.push_back(wave);
 
         Dropdown sync;
         sync.param = kParamLfo1Sync;
         sync.accent = p.accent;
-        sync.x = p.x + 14.0f; sync.y = wave.y + wave.h + 14.0f; sync.w = p.w - 28.0f; sync.h = 28.0f;
+        sync.x = p.x + 12.0f; sync.y = wave.y + wave.h + 8.0f; sync.w = p.w - 24.0f; sync.h = 24.0f;
         sync.options = syncOptions();
         L.dropdowns.push_back(sync);
 
-        L.knobs.push_back({ kParamLfo1RateHz, p.x + p.w * 0.5f, sync.y + sync.h + 56.0f, 26.0f, "RATE", p.accent });
+        L.knobs.push_back({ kParamLfo1RateHz, p.x + p.w * 0.5f, sync.y + sync.h + 32.0f, 22.0f, "RATE", p.accent });
     }
     {
         const PanelBox& p = L.panels[7];
         Selector wave;
         wave.param = kParamLfo2Waveform;
         wave.accent = p.accent;
-        wave.x = p.x + 14.0f; wave.y = p.y + 34.0f; wave.w = p.w - 28.0f; wave.h = 30.0f;
+        wave.x = p.x + 12.0f; wave.y = p.y + 26.0f; wave.w = p.w - 24.0f; wave.h = 24.0f;
         wave.options = { { 0.0f, "SINE" }, { 1.0f, "SAW" }, { 2.0f, "SQR" } };
         L.selectors.push_back(wave);
 
         Dropdown sync;
         sync.param = kParamLfo2Sync;
         sync.accent = p.accent;
-        sync.x = p.x + 14.0f; sync.y = wave.y + wave.h + 14.0f; sync.w = p.w - 28.0f; sync.h = 28.0f;
+        sync.x = p.x + 12.0f; sync.y = wave.y + wave.h + 8.0f; sync.w = p.w - 24.0f; sync.h = 24.0f;
         sync.options = syncOptions();
         L.dropdowns.push_back(sync);
 
-        L.knobs.push_back({ kParamLfo2RateHz, p.x + p.w * 0.5f, sync.y + sync.h + 56.0f, 26.0f, "RATE", p.accent });
+        L.knobs.push_back({ kParamLfo2RateHz, p.x + p.w * 0.5f, sync.y + sync.h + 32.0f, 22.0f, "RATE", p.accent });
     }
 
     // --- patch bay --- (the mod matrix: 6 sources x 7 destinations, all
@@ -474,11 +460,11 @@ inline Layout buildLayout(float width, float height)
     {
         const PanelBox& p = L.panels[8];
 
-        const float headerY = p.y + 46.0f;      // source jack row
-        const float gridLeftX = p.x + 92.0f;    // first source column
-        const float gridRightX = p.x + p.w - 18.0f;
-        const float gridTop = headerY + 38.0f;  // first destination row
-        const float gridBottom = p.y + p.h - 18.0f;
+        const float headerY = p.y + 34.0f;      // source jack row
+        const float gridLeftX = p.x + 90.0f;    // first source column
+        const float gridRightX = p.x + p.w - 16.0f;
+        const float gridTop = headerY + 30.0f;  // first destination row
+        const float gridBottom = p.y + p.h - 14.0f;
 
         for (int s = 0; s < kModSourceCount; ++s)
         {
@@ -513,23 +499,23 @@ inline Layout buildLayout(float width, float height)
     {
         const PanelBox& p = L.panels[9];
         const float cy = p.y + p.h * 0.5f;
-        L.knobs.push_back({ kParamMasterVolume, p.x + 40.0f, cy, 26.0f, "VOLUME", kCrtGreen });
+        L.knobs.push_back({ kParamMasterVolume, p.x + 50.0f, cy, 22.0f, "VOLUME", kCrtGreen });
 
         Selector mode;
         mode.param = kParamVoiceMode;
         mode.accent = p.accent;
-        mode.x = p.x + 95.0f; mode.y = cy - 14.0f; mode.w = 110.0f; mode.h = 28.0f;
+        mode.x = p.x + 150.0f; mode.y = cy - 12.0f; mode.w = 120.0f; mode.h = 24.0f;
         mode.options = { { 0.0f, "POLY" }, { 1.0f, "MONO" } };
         L.selectors.push_back(mode);
 
-        L.knobs.push_back({ kParamPortamentoTime, p.x + 225.0f, cy, 20.0f, "GLIDE", kCrtGreen });
-        L.knobs.push_back({ kParamPitchBendRange, p.x + 275.0f, cy, 20.0f, "BEND", kCrtGreen });
+        L.knobs.push_back({ kParamPortamentoTime, p.x + 400.0f, cy, 16.0f, "GLIDE", kCrtGreen });
+        L.knobs.push_back({ kParamPitchBendRange, p.x + 450.0f, cy, 16.0f, "BEND", kCrtGreen });
 
         Selector glideMode;
         glideMode.param = kParamGlideMode;
         glideMode.accent = p.accent;
         glideMode.caption = "GLIDE MODE";
-        glideMode.x = p.x + 310.0f; glideMode.y = cy - 14.0f; glideMode.w = 110.0f; glideMode.h = 28.0f;
+        glideMode.x = p.x + 500.0f; glideMode.y = cy - 12.0f; glideMode.w = 120.0f; glideMode.h = 24.0f;
         glideMode.options = { { 0.0f, "LEGATO" }, { 1.0f, "ALWAYS" } };
         L.selectors.push_back(glideMode);
     }
@@ -569,6 +555,19 @@ inline float normalizedToParam(uint32_t param, float t) noexcept
         return lo * std::pow(hi / lo, t);
     }
     return info.min + (info.max - info.min) * t;
+}
+
+// Shift+drag snap increment for a knob, in raw param units (0 = no
+// snapping for that param). Only assigned where a fixed step is actually
+// musically meaningful - e.g. Ring/Sync's Ratio knob, where landing exactly
+// on 0.5/1.0/1.5/2.0/... etc. matters far more than smooth sweeping does.
+inline float shiftSnapStep(uint32_t param) noexcept
+{
+    switch (param)
+    {
+    case kParamRingSyncRatio: return 0.25f;
+    default:                  return 0.0f;
+    }
 }
 
 // selector option rects are needed both for drawing and for mouse hit-testing;
@@ -1116,12 +1115,6 @@ inline void paint(cairo_t* cr, const Layout& L, const PaintState& state)
         cairo_text_extents(cr, subtitle, &ext);
         drawText(cr, subtitle, L.width - 20.0 - ext.width, 24.0);
     }
-
-    setColor(cr, kPanelEdge, 0.6);
-    cairo_set_line_width(cr, 1.0);
-    cairo_move_to(cr, 16.0, 54.0);
-    cairo_line_to(cr, L.width - 16.0, 54.0);
-    cairo_stroke(cr);
 
     paintPresetBar(cr, L.presetBar, state);
 
