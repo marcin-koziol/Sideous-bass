@@ -8,6 +8,9 @@
  */
 
 #include "DistrhoUI.hpp"
+#include "UiScale.hpp"
+
+#include <cmath>
 #include "Params.hpp"
 #include "ui/FactoryPresets.hpp"
 #include "ui/PresetStore.hpp"
@@ -29,9 +32,13 @@ class SideousBassUI : public UI
 {
 public:
     SideousBassUI()
-        : UI()
+        : UI(DISTRHO_UI_DEFAULT_WIDTH, DISTRHO_UI_DEFAULT_HEIGHT)
     {
-        fLayout = ui::buildLayout((float)getWidth(), (float)getHeight());
+        // UI scale (see UiScale.hpp): the window is sized to the scaled size,
+        // everything else below keeps working in the unscaled layout size
+        applyScale();
+
+        fLayout = ui::buildLayout((float)DISTRHO_UI_DEFAULT_WIDTH, (float)DISTRHO_UI_DEFAULT_HEIGHT);
 
         for (uint32_t i = 0; i < kParamCount; ++i)
             fValues[i] = getParamInfo(i).def;
@@ -83,6 +90,15 @@ protected:
     // needs, and worth avoiding on its own even before touching a crash.)
     void uiIdle() override
     {
+        // CLAP / VST3: the host sized its window from DPF's default before
+        // this UI existed, and a size set in the constructor never reaches
+        // it - announce the scaled size once, now that the host listens
+        if (!fHostSizeSynced)
+        {
+            fHostSizeSynced = true;
+            setSize(getWidth(), getHeight());
+        }
+
         if (!fHasActiveValueDisplay)
             return;
 
@@ -124,7 +140,14 @@ protected:
         state.hoverPresetButton = fHoverPresetButton;
         state.presetDeleteEnabled = fPresetIndex >= 0;
 
-        ui::paint(context.handle, fLayout, state);
+        sideous_uiscale::formatLabel(fScaleSetting, fScale, fScaleLabel, sizeof(fScaleLabel));
+        state.scaleLabel = fScaleLabel;
+
+        cairo_t* const cr = context.handle;
+        cairo_save(cr);
+        cairo_scale(cr, fScale, fScale);
+        ui::paint(cr, fLayout, state);
+        cairo_restore(cr);
     }
 
     // ---------------------------------------------------------------------
@@ -135,8 +158,8 @@ protected:
         if (ev.button != 1)
             return false;
 
-        const double mx = ev.pos.getX();
-        const double my = ev.pos.getY();
+        const double mx = ev.pos.getX() / fScale;
+        const double my = ev.pos.getY() / fScale;
 
         if (ev.press)
         {
@@ -154,6 +177,7 @@ protected:
                 case 1: fEditingName = false; presetStep(1);  break;
                 case 2: presetSave();   break;
                 case 3: fEditingName = false; presetDelete(); break;
+                case 4: fEditingName = false; cycleScale(); break;
                 default: fEditingName = false; break;
                 }
                 repaint();
@@ -261,8 +285,8 @@ protected:
 
     bool onMotion(const MotionEvent& ev) override
     {
-        const double mx = ev.pos.getX();
-        const double my = ev.pos.getY();
+        const double mx = ev.pos.getX() / fScale;
+        const double my = ev.pos.getY() / fScale;
 
         if (fDragKnob >= 0)
         {
@@ -327,7 +351,7 @@ protected:
         if (fOpenDropdown >= 0)
             return false;
 
-        const int knobIdx = hitTestKnob(ev.pos.getX(), ev.pos.getY());
+        const int knobIdx = hitTestKnob(ev.pos.getX() / fScale, ev.pos.getY() / fScale);
         if (knobIdx < 0)
             return false;
 
@@ -475,6 +499,7 @@ private:
         if (insideButton(pb.next, x, y)) return 1;
         if (insideButton(pb.save, x, y)) return 2;
         if (insideButton(pb.del, x, y) && fPresetIndex >= 0) return 3;
+        if (insideButton(pb.scale, x, y)) return 4;
         return -1;
     }
 
@@ -560,6 +585,32 @@ private:
         const int newIndex = fPresetIndex < (int)fPresetNames.size() ? fPresetIndex : (int)fPresetNames.size() - 1;
         loadPresetAt(newIndex);
     }
+
+    // ---------------------------------------------------------------------
+    // UI scale (UiScale.hpp): window = unscaled size * fScale; painting and
+    // mouse positions are converted at the edges, layout stays unscaled
+
+    void applyScale()
+    {
+        fScale = sideous_uiscale::resolve(fScaleSetting, getScaleFactor());
+        const uint w = (uint)std::lround(DISTRHO_UI_DEFAULT_WIDTH * fScale);
+        const uint h = (uint)std::lround(DISTRHO_UI_DEFAULT_HEIGHT * fScale);
+        setGeometryConstraints(w, h, true, false);
+        setSize(w, h);
+    }
+
+    void cycleScale()
+    {
+        fScaleSetting = sideous_uiscale::nextSetting(fScaleSetting);
+        sideous_uiscale::saveSetting(fScaleSetting);
+        applyScale();
+        repaint();
+    }
+
+    float fScaleSetting = sideous_uiscale::loadSetting(); // 0 = AUTO
+    double fScale = 1.0;
+    char fScaleLabel[24] = {};
+    bool fHostSizeSynced = false;
 
     ui::Layout fLayout;
     float fValues[kParamCount];
